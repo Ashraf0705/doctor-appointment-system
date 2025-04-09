@@ -1,5 +1,6 @@
 import express, { Express, Request, Response } from 'express';
-import { testConnection } from './config/database'; // <-- Ensure this import is present
+import { testConnection } from './config/database';
+import doctorRoutes from './routes/doctor.routes'; // <-- Ensure this import is present
 
 // Basic configuration (replace with actual config later)
 const PORT = process.env.PORT || 3000;
@@ -9,7 +10,7 @@ const app: Express = express();
 
 // Middleware to parse JSON request bodies
 app.use(express.json());
-
+app.use('/api/doctors', doctorRoutes);
 // Simple Root Route for testing
 app.get('/', (req: Request, res: Response) => {
   res.send('Doctor Appointment API is running!');
