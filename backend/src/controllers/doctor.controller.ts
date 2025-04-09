@@ -1,11 +1,10 @@
-import { Request, Response } from 'express';
-import * as doctorService from '../services/doctor.service'; // Import service functions
+// Add NextFunction to the import
+import { Request, Response, NextFunction } from 'express'; 
+import * as doctorService from '../services/doctor.service';
 
-export const getAllDoctorsController = async (req: Request, res: Response) => {
+export const getAllDoctorsController = async (req: Request, res: Response, next: NextFunction) => { // Add next
     try {
-        const doctors = await doctorService.getAllDoctors(); // Call the service function
-        
-        // Send successful response with doctors data
+        const doctors = await doctorService.getAllDoctors();
         res.status(200).json({
             status: 'success',
             count: doctors.length,
@@ -14,14 +13,41 @@ export const getAllDoctorsController = async (req: Request, res: Response) => {
             },
         });
     } catch (error) {
-        // Send error response
-        // Check if error is an instance of Error to safely access message
-        const message = error instanceof Error ? error.message : 'An unknown error occurred';
-        res.status(500).json({
-            status: 'error',
-            message: `Failed to get doctors: ${message}`,
-        });
+        // Pass error to Express error handler
+        next(error); // <-- Use next(error)
     }
 };
 
-// --- We will add functions for create, getById, update, delete later ---
+
+export const createDoctorController = async (req: Request, res: Response, next: NextFunction) => { // Add next
+    const { name, specialization, experience, contact_info } = req.body;
+
+    // --- Keep the validation logic ---
+    if (!name || !specialization || experience === undefined || !contact_info) {
+       // ... return 400 status ...
+    }
+     if (typeof experience !== 'number' || !Number.isInteger(experience) || experience < 0) {
+        // ... return 400 status ...
+    }
+    // --- End validation ---
+
+    try {
+        const doctorInput: doctorService.DoctorInput = {
+             name,
+             specialization,
+             experience,
+             contact_info
+        };
+        const newDoctor = await doctorService.createDoctor(doctorInput);
+        res.status(201).json({
+            status: 'success',
+            message: 'Doctor created successfully!',
+            data: {
+                doctor: newDoctor,
+            },
+        });
+    } catch (error) {
+         // Pass error to Express error handler
+        next(error); // <-- Use next(error)
+    }
+};
