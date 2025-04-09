@@ -1,7 +1,21 @@
 import pool from '../config/database';
 import { RowDataPacket, OkPacket } from 'mysql2/promise';
 import { randomBytes } from 'crypto'; // For cancellation code
-import { getAvailableSlots } from './slot.service'; // Import to reuse validation logic concept
+// No need to import slot service here anymore
+
+// --- Helper function to get Doctor ID from Token ---
+// Moved near top for clarity or could be imported from doctor.service if preferred
+const getDoctorIdByToken = async (token: string): Promise<number | null> => {
+    try {
+        const [rows] = await pool.query<RowDataPacket[]>('SELECT id FROM Doctors WHERE management_token = ?', [token]);
+        return rows.length > 0 ? rows[0].id : null;
+    } catch (error) {
+        console.error(`[Service Error]: Error fetching doctor ID for token ${token}:`, error);
+        // Propagate error or handle as needed, returning null indicates failure here
+        return null; 
+    }
+};
+
 
 // --- Interfaces ---
 export interface Appointment {
@@ -24,32 +38,26 @@ export interface AppointmentInput {
     appointmentTime: string; // Expecting 'YYYY-MM-DD HH:MM:SS' from client request
 }
 
-// --- Helper: Check Slot Availability (More specific than getAvailableSlots) ---
-// Checks if a SINGLE specific slot is available for booking
+// --- Helper: Check Slot Availability ---
 const isSlotAvailable = async (doctorId: number, appointmentTime: string): Promise<boolean> => {
-    // 1. Basic time validation might be useful here too, or rely on DB constraints
-    
-    // 2. Get the specific date and day of week
     try {
         const targetDateTime = new Date(appointmentTime);
-        const dateStr = appointmentTime.split(' ')[0]; // 'YYYY-MM-DD'
-        const timeStr = appointmentTime.split(' ')[1]; // 'HH:MM:SS'
+        const dateStr = appointmentTime.split(' ')[0];
+        const timeStr = appointmentTime.split(' ')[1];
         const dayOfWeek = targetDateTime.getDay();
 
-        // 3. Check if time falls within any availability block for that day
         const blockQuery = `
             SELECT 1 FROM AvailabilityBlocks 
             WHERE doctor_id = ? AND day_of_week = ? AND TIME(?) BETWEEN start_time AND TIME(SUBTIME(end_time, '0:0:1'))
             LIMIT 1 
-        `; // Check if time is >= start_time and < end_time
+        `;
         const [blocks] = await pool.query<RowDataPacket[]>(blockQuery, [doctorId, dayOfWeek, timeStr]);
 
         if (blocks.length === 0) {
             console.log(`[Validation]: Slot ${appointmentTime} is outside availability blocks.`);
-            return false; // Not within any block
+            return false;
         }
 
-        // 4. Check if the exact slot is already booked (and not cancelled)
         const appointmentQuery = `
             SELECT 1 FROM Appointments 
             WHERE doctor_id = ? AND appointment_time = ? AND status != 'Cancelled' 
@@ -59,14 +67,13 @@ const isSlotAvailable = async (doctorId: number, appointmentTime: string): Promi
 
         if (appointments.length > 0) {
              console.log(`[Validation]: Slot ${appointmentTime} is already booked.`);
-            return false; // Slot already booked
+            return false;
         }
 
-        return true; // Slot is within a block and not booked
+        return true;
 
     } catch (error) {
          console.error(`[Validation Error]: Error checking slot availability for Dr ${doctorId} at ${appointmentTime}:`, error);
-         // Treat validation errors as slot being unavailable for safety
          return false; 
     }
 };
@@ -76,14 +83,12 @@ const isSlotAvailable = async (doctorId: number, appointmentTime: string): Promi
 export const bookAppointment = async (input: AppointmentInput): Promise<Appointment> => {
     const { doctorId, patientName, patientContactInfo, appointmentTime } = input;
     
-    // **Crucial Validation Step**
     const slotIsAvailable = await isSlotAvailable(doctorId, appointmentTime);
     if (!slotIsAvailable) {
         throw new Error(`Slot at ${appointmentTime} is not available for booking.`);
     }
 
-    // Generate unique cancellation code
-    const cancellationCode = randomBytes(16).toString('hex'); // 32 hex chars, shorter is okay here
+    const cancellationCode = randomBytes(16).toString('hex');
 
     try {
         const query = `
@@ -95,7 +100,6 @@ export const bookAppointment = async (input: AppointmentInput): Promise<Appointm
         const [result] = await pool.query<OkPacket>(query, values);
 
         if (result.insertId) {
-            // Fetch the newly created appointment to return
             const [newApptRows] = await pool.query<RowDataPacket[]>(
                 'SELECT * FROM Appointments WHERE id = ?',
                 [result.insertId]
@@ -110,12 +114,9 @@ export const bookAppointment = async (input: AppointmentInput): Promise<Appointm
         }
     } catch (error) {
         console.error('[Service Error]: Error booking appointment:', error);
-         // Handle potential duplicate entry from unique constraint (race condition)
         if (error instanceof Error && 'code' in error && error.code === 'ER_DUP_ENTRY') {
-            // This likely means the unique_doctor_time constraint was hit
              throw new Error(`Slot at ${appointmentTime} was booked by another user just now. Please try a different slot.`);
         }
-         // Re-throw validation error
          if (error instanceof Error && error.message.includes('not available for booking')) {
               throw error;
          }
@@ -125,13 +126,12 @@ export const bookAppointment = async (input: AppointmentInput): Promise<Appointm
 
 // --- GET ALL APPOINTMENTS ---
 export const getAllAppointments = async (): Promise<Appointment[]> => {
-    // Consider adding filtering options (doctorId, date range) later
     try {
         const query = `
             SELECT id, doctor_id, patient_name, patient_contact_info, appointment_time, status, created_at, updated_at 
             FROM Appointments 
             ORDER BY appointment_time DESC 
-        `; // Exclude cancellation_code from general list view
+        `; 
         const [rows] = await pool.query<RowDataPacket[]>(query);
         return rows as Appointment[];
     } catch (error) {
@@ -147,7 +147,7 @@ export const getAppointmentById = async (id: number): Promise<Appointment | null
             SELECT id, doctor_id, patient_name, patient_contact_info, appointment_time, status, created_at, updated_at 
             FROM Appointments 
             WHERE id = ?
-        `; // Exclude cancellation_code
+        `; 
         const [rows] = await pool.query<RowDataPacket[]>(query, [id]);
         return rows.length > 0 ? (rows[0] as Appointment) : null;
     } catch (error) {
@@ -159,34 +159,50 @@ export const getAppointmentById = async (id: number): Promise<Appointment | null
 
 // --- CANCEL APPOINTMENT BY CANCELLATION CODE ---
 export const cancelAppointmentByCode = async (code: string): Promise<boolean> => {
-    // Returns true if cancelled, false if code not found or already cancelled
     try {
         const query = `
             UPDATE Appointments 
             SET status = 'Cancelled', updated_at = CURRENT_TIMESTAMP 
             WHERE cancellation_code = ? AND status != 'Cancelled' 
-        `; // Only update if found and not already cancelled
-        
+        `; 
         const [result] = await pool.query<OkPacket>(query, [code]);
-        
-        return result.affectedRows > 0; // True if a row was updated
-
+        return result.affectedRows > 0; 
     } catch (error) {
         console.error(`[Service Error]: Error cancelling appointment with code ${code}:`, error);
         throw new Error('Failed to cancel appointment.');
     }
 };
 
-// --- UPDATE STATUS (for doctor/admin - Placeholder) ---
-// We'll implement this properly later, requires management token logic
-export const updateAppointmentStatus = async (id: number, status: 'Confirmed' | 'Cancelled'): Promise<boolean> => {
-     console.warn("updateAppointmentStatus service function - authorization logic needed!");
+// --- UPDATE STATUS (for doctor/admin - Refined with Token Auth Check) ---
+export const updateAppointmentStatus = async (
+     appointmentId: number, 
+     status: 'Confirmed' | 'Cancelled', 
+     doctorToken: string // Require the token for authorization
+    ): Promise<boolean> => { 
+     
      try {
-          const query = `UPDATE Appointments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-          const [result] = await pool.query<OkPacket>(query, [status, id]);
-          return result.affectedRows > 0;
+         // 1. Verify the token and get the doctor's ID
+         const requestingDoctorId = await getDoctorIdByToken(doctorToken);
+         if (!requestingDoctorId) {
+             console.warn(`[Auth Warn]: Invalid management token provided for status update.`);
+             // Return false indicates failure, controller should send appropriate response (e.g., 404/403)
+             return false; 
+         }
+
+         // 2. Update status ONLY IF the appointment belongs to the requesting doctor
+         const query = `
+            UPDATE Appointments 
+            SET status = ?, updated_at = CURRENT_TIMESTAMP 
+            WHERE id = ? AND doctor_id = ? 
+         `; // Add check for doctor_id
+         
+         const [result] = await pool.query<OkPacket>(query, [status, appointmentId, requestingDoctorId]);
+         
+         // result.affectedRows will be 0 if appointmentId doesn't exist OR if it doesn't belong to requestingDoctorId
+         return result.affectedRows > 0;
+
      } catch(error) {
-           console.error(`[Service Error]: Error updating status for appointment ${id}:`, error);
-           throw new Error('Failed to update appointment status.');
+           console.error(`[Service Error]: Error updating status for appointment ${appointmentId}:`, error);
+           throw new Error('Failed to update appointment status.'); // Let controller handle generic DB errors
      }
 };

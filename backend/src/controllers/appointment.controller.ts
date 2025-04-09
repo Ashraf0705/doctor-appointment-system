@@ -13,12 +13,10 @@ export const bookAppointmentController = async (req: Request, res: Response, nex
         if (typeof doctorId !== 'number' || doctorId <= 0) {
              return res.status(400).json({ status: 'error', message: 'Invalid doctorId.' });
         }
-        // Basic datetime format check (YYYY-MM-DD HH:MM:SS) - more robust needed in real app
         const dateTimeRegex = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
         if (typeof appointmentTime !== 'string' || !dateTimeRegex.test(appointmentTime)) {
              return res.status(400).json({ status: 'error', message: 'Invalid appointmentTime format. Use "YYYY-MM-DD HH:MM:SS".' });
         }
-         // Could add check: is appointmentTime in the past?
 
         const input: appointmentService.AppointmentInput = { doctorId, patientName, patientContactInfo, appointmentTime };
         const newAppointment = await appointmentService.bookAppointment(input);
@@ -27,26 +25,25 @@ export const bookAppointmentController = async (req: Request, res: Response, nex
             status: 'success',
             message: 'Appointment booked successfully!',
             data: {
-                appointment: newAppointment, // Includes cancellation_code
+                appointment: newAppointment,
             },
         });
 
     } catch (error) {
-         // Handle specific validation/booking errors from service
          if (error instanceof Error && error.message.includes('not available for booking')) {
-             return res.status(409).json({ status: 'fail', message: error.message }); // 409 Conflict
+             return res.status(409).json({ status: 'fail', message: error.message });
          }
           if (error instanceof Error && error.message.includes('booked by another user')) {
-             return res.status(409).json({ status: 'fail', message: error.message }); // 409 Conflict
+             return res.status(409).json({ status: 'fail', message: error.message });
          }
-        next(error); // Pass other errors to global handler
+        next(error);
     }
 };
+
 
 // --- GET ALL APPOINTMENTS CONTROLLER ---
 export const getAllAppointmentsController = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        // TODO: Add query parameter handling for filtering later (e.g., ?doctorId=1&date=...)
         const appointments = await appointmentService.getAllAppointments();
         res.status(200).json({
             status: 'success',
@@ -87,9 +84,8 @@ export const cancelAppointmentByCodeController = async (req: Request, res: Respo
         const cancelled = await appointmentService.cancelAppointmentByCode(cancellationCode);
 
         if (cancelled) {
-            res.status(200).json({ status: 'success', message: 'Appointment cancelled successfully.' }); // Use 200 OK with message for clarity
+            res.status(200).json({ status: 'success', message: 'Appointment cancelled successfully.' });
         } else {
-            // Code not found or appointment already cancelled
             res.status(404).json({ status: 'fail', message: 'Invalid or expired cancellation code.' });
         }
     } catch (error) {
@@ -97,27 +93,37 @@ export const cancelAppointmentByCodeController = async (req: Request, res: Respo
     }
 };
 
-// --- UPDATE STATUS CONTROLLER (Placeholder) ---
+// --- UPDATE STATUS CONTROLLER (Refined with Token Auth Check) ---
 export const updateAppointmentStatusController = async (req: Request, res: Response, next: NextFunction) => {
      try {
-         const id = parseInt(req.params.id, 10);
+         const appointmentId = parseInt(req.params.id, 10);
          const { status } = req.body;
-         const { managementToken } = req.query; // Or from auth header later
+         // Get token from query param for simplicity now - header would be better practice
+         const doctorToken = req.query.managementToken as string | undefined; 
 
-         if (isNaN(id) || id <= 0) return res.status(400).json({ status: 'error', message: 'Invalid appointment ID.'});
-         if (status !== 'Confirmed' && status !== 'Cancelled') return res.status(400).json({ status: 'error', message: 'Invalid status. Must be "Confirmed" or "Cancelled".'});
-         if (!managementToken) return res.status(401).json({ status: 'error', message: 'Authorization required (management token).'}); // Basic check
+         // --- Validation ---
+         if (isNaN(appointmentId) || appointmentId <= 0) {
+              return res.status(400).json({ status: 'error', message: 'Invalid appointment ID.'});
+         }
+         if (status !== 'Confirmed' && status !== 'Cancelled') { // Allow cancelling via this route too
+              return res.status(400).json({ status: 'error', message: 'Invalid status. Must be "Confirmed" or "Cancelled".'});
+         }
+         if (!doctorToken) {
+              // Use 401 Unauthorized or 403 Forbidden
+              return res.status(401).json({ status: 'error', message: 'Authorization required: Management token missing.'}); 
+         }
+         // --- End Validation ---
 
-         // TODO: Validate managementToken actually belongs to the appointment's doctor
-         console.warn("Authorization check for management token needed here!");
 
-         const updated = await appointmentService.updateAppointmentStatus(id, status);
+         const updated = await appointmentService.updateAppointmentStatus(appointmentId, status, doctorToken);
+         
          if(updated) {
              res.status(200).json({ status: 'success', message: `Appointment status updated to ${status}.`});
          } else {
-             res.status(404).json({ status: 'fail', message: `Appointment with ID ${id} not found.`});
+             // This now means EITHER appointment not found OR token invalid/doesn't match doctor
+             res.status(404).json({ status: 'fail', message: `Appointment not found or authorization failed.`});
          }
      } catch (error) {
-         next(error);
+         next(error); // Pass DB errors etc. to global handler
      }
 };
