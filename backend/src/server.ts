@@ -1,6 +1,7 @@
 import express, { Express, Request, Response, NextFunction } from 'express'; // Import NextFunction
 import { testConnection } from './config/database';
 import doctorRoutes from './routes/doctor.routes';
+import availabilityRoutes from './routes/availability.routes';
 // Import other route files here as you create them (e.g., appointmentRoutes)
 
 // Basic configuration (replace with actual config later)
@@ -15,6 +16,7 @@ app.use(express.json()); // Parse JSON request bodies
 // --- API Routes ---
 // Mount the doctor routes
 app.use('/api/doctors', doctorRoutes);
+app.use('/api/availability', availabilityRoutes);
 
 // Mount other routes here (e.g., app.use('/api/appointments', appointmentRoutes);)
 
