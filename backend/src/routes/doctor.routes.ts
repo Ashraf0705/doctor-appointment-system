@@ -1,10 +1,11 @@
-import { Router } from 'express'; // Request, Response removed as they are used in controller
-import { getAllDoctorsController , createDoctorController } from '../controllers/doctor.controller'; // <-- Import controller
+import { Router, RequestHandler } from 'express'; // Request, Response removed as they are used in controller
+import { getAllDoctorsController , createDoctorController ,getDoctorByIdController } from '../controllers/doctor.controller'; // <-- Import controller
 
 const router = Router();
 
 // Define Doctor routes
 router.get('/', getAllDoctorsController);
 router.post('/', createDoctorController);
+router.get('/:id', getDoctorByIdController as RequestHandler);  
 
 export default router;

@@ -51,3 +51,32 @@ export const createDoctorController = async (req: Request, res: Response, next: 
         next(error); // <-- Use next(error)
     }
 };
+
+// --- GET DOCTOR BY ID CONTROLLER ---
+export const getDoctorByIdController = async (req: Request, res: Response, next: NextFunction) => { // Ensure next is here
+    try {
+        const id = parseInt(req.params.id, 10); 
+
+        if (isNaN(id) || id <= 0) {
+            return res.status(400).json({ status: 'error', message: 'Invalid doctor ID provided.' });
+        }
+
+        const doctor = await doctorService.getDoctorById(id);
+
+        if (doctor) {
+            res.status(200).json({
+                status: 'success',
+                data: {
+                    doctor,
+                },
+            });
+        } else {
+            res.status(404).json({
+                status: 'fail', 
+                message: `Doctor with ID ${id} not found.`,
+            });
+        }
+    } catch (error) {
+        next(error); // Ensure errors are passed to next()
+    }
+};

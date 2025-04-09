@@ -77,5 +77,24 @@ export const createDoctor = async (doctorInput: DoctorInput): Promise<Doctor> =>
     }
 }; // <-- Make sure the closing brace } is here
 
+// --- GET DOCTOR BY ID ---
+export const getDoctorById = async (id: number): Promise<Doctor | null> => {
+    try {
+        // Select all fields EXCEPT management_token for public view
+        const query = `
+            SELECT id, name, specialization, experience, contact_info, created_at, updated_at 
+            FROM Doctors 
+            WHERE id = ?
+        `;
+        const [rows] = await pool.query<RowDataPacket[]>(query, [id]);
 
-// --- We will add functions for getById, update, delete later ---
+        if (rows.length > 0) {
+            return rows[0] as Doctor; // Return the found doctor
+        } else {
+            return null; // Return null if no doctor found with that ID
+        }
+    } catch (error) {
+        console.error(`[Service Error]: Error fetching doctor with ID ${id}:`, error);
+        throw new Error('Failed to fetch doctor from database.');
+    }
+};
