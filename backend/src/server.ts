@@ -3,6 +3,7 @@ import { testConnection } from './config/database';
 import doctorRoutes from './routes/doctor.routes';
 import availabilityRoutes from './routes/availability.routes';
 import slotRoutes from './routes/slot.routes';
+import appointmentRoutes from './routes/appointment.routes';
 // Import other route files here as you create them (e.g., appointmentRoutes)
 
 // Basic configuration (replace with actual config later)
@@ -19,6 +20,7 @@ app.use(express.json()); // Parse JSON request bodies
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/availability', availabilityRoutes);
 app.use('/api/slots', slotRoutes);
+app.use('/api/appointments', appointmentRoutes);
 
 // Mount other routes here (e.g., app.use('/api/appointments', appointmentRoutes);)
 

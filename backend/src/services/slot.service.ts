@@ -2,17 +2,8 @@ import pool from '../config/database';
 import { RowDataPacket } from 'mysql2/promise';
 import { AvailabilityBlock } from './availability.service'; // Import interface
 
-// --- TEMPORARY Placeholder until appointment.service.ts is created ---
-// This defines the basic structure we expect from an Appointment record for now
-interface Appointment {
-    id: number;
-    doctor_id: number;
-    appointment_time: Date | string; // DB returns string/Date object
-    status?: 'Pending' | 'Confirmed' | 'Cancelled'; // Added status for filtering
-    // other fields like patient_name etc. might exist but aren't needed for this specific calculation
-}
-// --- End Temporary Placeholder ---
-
+// At the top with other imports:
+import { Appointment } from './appointment.service'; // Import real interface
 
 // Define structure for an available slot
 export interface AvailableSlot {
