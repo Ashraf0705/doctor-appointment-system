@@ -123,4 +123,70 @@ export const bookAppointment = async (input: AppointmentInput): Promise<Appointm
     }
 };
 
-// --- Other service functions (get, delete, update status) will go here ---
+// --- GET ALL APPOINTMENTS ---
+export const getAllAppointments = async (): Promise<Appointment[]> => {
+    // Consider adding filtering options (doctorId, date range) later
+    try {
+        const query = `
+            SELECT id, doctor_id, patient_name, patient_contact_info, appointment_time, status, created_at, updated_at 
+            FROM Appointments 
+            ORDER BY appointment_time DESC 
+        `; // Exclude cancellation_code from general list view
+        const [rows] = await pool.query<RowDataPacket[]>(query);
+        return rows as Appointment[];
+    } catch (error) {
+        console.error('[Service Error]: Error fetching all appointments:', error);
+        throw new Error('Failed to fetch appointments.');
+    }
+};
+
+// --- GET APPOINTMENT BY ID ---
+export const getAppointmentById = async (id: number): Promise<Appointment | null> => {
+    try {
+        const query = `
+            SELECT id, doctor_id, patient_name, patient_contact_info, appointment_time, status, created_at, updated_at 
+            FROM Appointments 
+            WHERE id = ?
+        `; // Exclude cancellation_code
+        const [rows] = await pool.query<RowDataPacket[]>(query, [id]);
+        return rows.length > 0 ? (rows[0] as Appointment) : null;
+    } catch (error) {
+        console.error(`[Service Error]: Error fetching appointment with ID ${id}:`, error);
+        throw new Error('Failed to fetch appointment.');
+    }
+};
+
+
+// --- CANCEL APPOINTMENT BY CANCELLATION CODE ---
+export const cancelAppointmentByCode = async (code: string): Promise<boolean> => {
+    // Returns true if cancelled, false if code not found or already cancelled
+    try {
+        const query = `
+            UPDATE Appointments 
+            SET status = 'Cancelled', updated_at = CURRENT_TIMESTAMP 
+            WHERE cancellation_code = ? AND status != 'Cancelled' 
+        `; // Only update if found and not already cancelled
+        
+        const [result] = await pool.query<OkPacket>(query, [code]);
+        
+        return result.affectedRows > 0; // True if a row was updated
+
+    } catch (error) {
+        console.error(`[Service Error]: Error cancelling appointment with code ${code}:`, error);
+        throw new Error('Failed to cancel appointment.');
+    }
+};
+
+// --- UPDATE STATUS (for doctor/admin - Placeholder) ---
+// We'll implement this properly later, requires management token logic
+export const updateAppointmentStatus = async (id: number, status: 'Confirmed' | 'Cancelled'): Promise<boolean> => {
+     console.warn("updateAppointmentStatus service function - authorization logic needed!");
+     try {
+          const query = `UPDATE Appointments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+          const [result] = await pool.query<OkPacket>(query, [status, id]);
+          return result.affectedRows > 0;
+     } catch(error) {
+           console.error(`[Service Error]: Error updating status for appointment ${id}:`, error);
+           throw new Error('Failed to update appointment status.');
+     }
+};

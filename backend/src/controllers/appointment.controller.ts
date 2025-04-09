@@ -43,4 +43,81 @@ export const bookAppointmentController = async (req: Request, res: Response, nex
     }
 };
 
-// --- Other controllers (get, delete, update status) will go here ---
+// --- GET ALL APPOINTMENTS CONTROLLER ---
+export const getAllAppointmentsController = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        // TODO: Add query parameter handling for filtering later (e.g., ?doctorId=1&date=...)
+        const appointments = await appointmentService.getAllAppointments();
+        res.status(200).json({
+            status: 'success',
+            count: appointments.length,
+            data: { appointments },
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// --- GET APPOINTMENT BY ID CONTROLLER ---
+export const getAppointmentByIdController = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id) || id <= 0) {
+            return res.status(400).json({ status: 'error', message: 'Invalid appointment ID.' });
+        }
+        const appointment = await appointmentService.getAppointmentById(id);
+        if (appointment) {
+            res.status(200).json({ status: 'success', data: { appointment } });
+        } else {
+            res.status(404).json({ status: 'fail', message: `Appointment with ID ${id} not found.` });
+        }
+    } catch (error) {
+        next(error);
+    }
+};
+
+// --- CANCEL APPOINTMENT BY CODE CONTROLLER ---
+export const cancelAppointmentByCodeController = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { cancellationCode } = req.params;
+        if (!cancellationCode) {
+            return res.status(400).json({ status: 'error', message: 'Cancellation code is required.' });
+        }
+
+        const cancelled = await appointmentService.cancelAppointmentByCode(cancellationCode);
+
+        if (cancelled) {
+            res.status(200).json({ status: 'success', message: 'Appointment cancelled successfully.' }); // Use 200 OK with message for clarity
+        } else {
+            // Code not found or appointment already cancelled
+            res.status(404).json({ status: 'fail', message: 'Invalid or expired cancellation code.' });
+        }
+    } catch (error) {
+        next(error);
+    }
+};
+
+// --- UPDATE STATUS CONTROLLER (Placeholder) ---
+export const updateAppointmentStatusController = async (req: Request, res: Response, next: NextFunction) => {
+     try {
+         const id = parseInt(req.params.id, 10);
+         const { status } = req.body;
+         const { managementToken } = req.query; // Or from auth header later
+
+         if (isNaN(id) || id <= 0) return res.status(400).json({ status: 'error', message: 'Invalid appointment ID.'});
+         if (status !== 'Confirmed' && status !== 'Cancelled') return res.status(400).json({ status: 'error', message: 'Invalid status. Must be "Confirmed" or "Cancelled".'});
+         if (!managementToken) return res.status(401).json({ status: 'error', message: 'Authorization required (management token).'}); // Basic check
+
+         // TODO: Validate managementToken actually belongs to the appointment's doctor
+         console.warn("Authorization check for management token needed here!");
+
+         const updated = await appointmentService.updateAppointmentStatus(id, status);
+         if(updated) {
+             res.status(200).json({ status: 'success', message: `Appointment status updated to ${status}.`});
+         } else {
+             res.status(404).json({ status: 'fail', message: `Appointment with ID ${id} not found.`});
+         }
+     } catch (error) {
+         next(error);
+     }
+};
