@@ -133,3 +133,36 @@ export const updateDoctorByTokenController = async (req: Request, res: Response,
         next(error); // Pass errors to global handler
     }
 };
+
+// --- DELETE DOCTOR BY TOKEN CONTROLLER ---
+export const deleteDoctorByTokenController = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { managementToken } = req.params; // Get token from URL
+
+        if (!managementToken) {
+            return res.status(400).json({ status: 'error', message: 'Management token is required.' });
+        }
+
+        const deleted = await doctorService.deleteDoctorByToken(managementToken);
+
+        if (deleted) {
+            // Send success response - 204 No Content is standard for successful DELETE
+            res.status(204).send(); // No content needed in the response body
+        } else {
+            // Doctor not found with that token
+            res.status(404).json({
+                status: 'fail',
+                message: `Doctor with provided management token not found.`,
+            });
+        }
+    } catch (error) {
+         // Handle specific error for appointments constraint
+         if (error instanceof Error && error.message.includes('existing appointments')) {
+             return res.status(409).json({ // 409 Conflict is appropriate here
+                 status: 'fail',
+                 message: error.message
+             });
+         }
+        next(error); // Pass other errors to global handler
+    }
+};

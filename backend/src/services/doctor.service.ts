@@ -163,3 +163,31 @@ export const updateDoctorByToken = async (token: string, doctorUpdateInput: Part
         throw new Error('Failed to update doctor in database.');
     }
 };
+
+
+// --- DELETE DOCTOR BY TOKEN ---
+export const deleteDoctorByToken = async (token: string): Promise<boolean> => {
+    // Returns true if deletion was successful, false otherwise
+    try {
+        const query = `
+            DELETE FROM Doctors 
+            WHERE management_token = ?
+        `;
+        
+        // DELETE query also returns OkPacket
+        const [result] = await pool.query<OkPacket>(query, [token]);
+
+        // Check if any row was actually deleted
+        return result.affectedRows > 0; 
+
+    } catch (error) {
+        console.error(`[Service Error]: Error deleting doctor with token ${token}:`, error);
+        // Specific check for foreign key constraint violation (if doctor has appointments)
+        // MySQL error code for foreign key constraint failure is often 1451
+        if (error instanceof Error && 'code' in error && (error as any).errno === 1451) {
+             console.warn(`[Service Warning]: Attempted to delete doctor with token ${token} who has existing appointments.`);
+             throw new Error('Cannot delete doctor: Doctor has existing appointments. Please cancel or reassign appointments first.'); // More specific error
+        }
+        throw new Error('Failed to delete doctor from database.');
+    }
+};
