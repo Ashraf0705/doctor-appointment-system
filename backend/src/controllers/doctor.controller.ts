@@ -80,3 +80,56 @@ export const getDoctorByIdController = async (req: Request, res: Response, next:
         next(error); // Ensure errors are passed to next()
     }
 };
+
+// --- UPDATE DOCTOR BY TOKEN CONTROLLER ---
+export const updateDoctorByTokenController = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { managementToken } = req.params; // Get token from URL parameter
+        const updateData = req.body; // Get potential update fields from request body
+
+        // Basic validation: Check if token exists and if body is not empty
+        if (!managementToken) {
+            return res.status(400).json({ status: 'error', message: 'Management token is required.' });
+        }
+        if (Object.keys(updateData).length === 0) {
+             return res.status(400).json({ status: 'error', message: 'No update data provided.' });
+        }
+        // Add more specific validation for experience if provided
+        if (updateData.experience !== undefined) {
+            if (typeof updateData.experience !== 'number' || !Number.isInteger(updateData.experience) || updateData.experience < 0) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'Experience must be a non-negative integer.',
+                });
+            }
+        }
+
+        // Prepare allowed update fields (avoid passing unwanted fields like id)
+        const allowedUpdateInput: Partial<doctorService.DoctorInput> = {};
+        if (updateData.name !== undefined) allowedUpdateInput.name = updateData.name;
+        if (updateData.specialization !== undefined) allowedUpdateInput.specialization = updateData.specialization;
+        if (updateData.experience !== undefined) allowedUpdateInput.experience = updateData.experience;
+        if (updateData.contact_info !== undefined) allowedUpdateInput.contact_info = updateData.contact_info;
+
+
+        const updatedDoctor = await doctorService.updateDoctorByToken(managementToken, allowedUpdateInput);
+
+        if (updatedDoctor) {
+            res.status(200).json({
+                status: 'success',
+                message: 'Doctor updated successfully!',
+                data: {
+                    doctor: updatedDoctor, // Return updated doctor data
+                },
+            });
+        } else {
+            // Doctor not found with that token
+            res.status(404).json({
+                status: 'fail',
+                message: `Doctor with provided management token not found or no update was needed.`,
+            });
+        }
+    } catch (error) {
+        next(error); // Pass errors to global handler
+    }
+};
