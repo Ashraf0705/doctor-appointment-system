@@ -1,4 +1,5 @@
 import express, { Express, Request, Response, NextFunction } from 'express'; // Import NextFunction
+import cors from 'cors';
 import { testConnection } from './config/database';
 import doctorRoutes from './routes/doctor.routes';
 import availabilityRoutes from './routes/availability.routes';
@@ -12,7 +13,8 @@ const PORT = process.env.PORT || 3000;
 // Create Express app instance
 const app: Express = express();
 
-// Core Middleware
+// --- Core Middleware ---
+app.use(cors()); // <-- Enable CORS for all origins (simplest for development)
 app.use(express.json()); // Parse JSON request bodies
 
 // --- API Routes ---
