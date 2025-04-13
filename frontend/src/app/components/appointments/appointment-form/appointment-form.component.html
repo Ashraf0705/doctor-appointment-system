@@ -1,1 +1,87 @@
-<p>appointment-form works!</p>
+<mat-card>
+    <mat-card-header>
+        <mat-card-title>Book Appointment</mat-card-title>
+        <mat-card-subtitle *ngIf="doctor">
+            With {{ doctor.name }} ({{ doctor.specialization }})
+        </mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+        <!-- Display Selected Time -->
+        <div *ngIf="appointmentTime" class="booking-details">
+            <mat-icon>calendar_today</mat-icon> 
+            <span>Date: {{ appointmentTime | date:'longDate' }}</span> 
+            <mat-icon>schedule</mat-icon>
+            <span>Time: {{ appointmentTime | date:'shortTime' }}</span>
+        </div>
+        <mat-divider *ngIf="appointmentTime"></mat-divider>
+
+
+        <!-- Form for Patient Details -->
+        <form [formGroup]="appointmentForm" (ngSubmit)="onSubmit()" style="margin-top: 20px;">
+
+            <!-- Patient Name -->
+            <mat-form-field appearance="outline" class="form-field">
+                <mat-label>Your Name</mat-label>
+                <input matInput placeholder="Enter your full name" formControlName="patientName" required>
+                <mat-icon matSuffix>account_circle</mat-icon>
+                <mat-error *ngIf="f['patientName'].touched && f['patientName'].errors?.['required']">
+                    Your name is required.
+                </mat-error>
+                 <mat-error *ngIf="f['patientName'].touched && f['patientName'].errors?.['minlength']">
+                    Name must be at least 2 characters.
+                 </mat-error>
+            </mat-form-field>
+
+            <!-- Patient Contact Info -->
+            <mat-form-field appearance="outline" class="form-field">
+                <mat-label>Your Contact Email</mat-label>
+                <input matInput type="email" placeholder="Enter your email address" formControlName="patientContactInfo" required email>
+                <mat-icon matSuffix>contact_mail</mat-icon>
+                 <mat-error *ngIf="f['patientContactInfo'].touched && f['patientContactInfo'].errors?.['required']">
+                    Contact email is required.
+                 </mat-error>
+                 <mat-error *ngIf="f['patientContactInfo'].touched && f['patientContactInfo'].errors?.['email']">
+                    Please enter a valid email address.
+                 </mat-error>
+            </mat-form-field>
+
+            <!-- Loading & Error Display -->
+            <div *ngIf="isLoading" style="text-align: center; padding: 10px;">
+                <mat-spinner diameter="30"></mat-spinner> Booking...
+            </div>
+            <div *ngIf="errorMessage && !isLoading" class="form-error-message">
+                {{ errorMessage }}
+            </div>
+
+        </form> <!-- Form ends -->
+
+    </mat-card-content>
+
+     <mat-card-actions align="end">
+        <!-- Cancel Button -->
+        <button mat-stroked-button type="button" routerLink="/doctors" [disabled]="isLoading">
+             Cancel Booking
+        </button>
+        <!-- Submit Button -->
+        <button mat-raised-button color="primary" type="submit" [disabled]="isLoading || appointmentForm.invalid || !doctorId || !appointmentTime" (click)="onSubmit()">
+             Confirm Booking
+        </button>
+    </mat-card-actions>
+
+</mat-card>
+
+<!-- Basic Styling -->
+<style>
+    .form-field { width: 100%; margin-bottom: 10px; }
+    .form-error-message { color: red; padding: 10px 0; text-align: center; font-weight: bold; }
+    .booking-details { 
+        padding: 10px 0; 
+        display: flex; 
+        align-items: center; 
+        gap: 15px; 
+        font-size: 1.1em;
+        flex-wrap: wrap; /* Allow wrap on small screens */
+    }
+     .booking-details mat-icon { margin-right: 5px; }
+</style>
