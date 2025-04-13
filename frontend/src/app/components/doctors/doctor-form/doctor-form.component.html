@@ -1,1 +1,110 @@
-<p>doctor-form works!</p>
+<mat-card>
+    <mat-card-header>
+      <mat-card-title>Register New Doctor</mat-card-title>
+    </mat-card-header>
+  
+    <mat-card-content>
+      <!-- Bind the form group and handle submission -->
+      <form [formGroup]="doctorForm" (ngSubmit)="onSubmit()">
+  
+        <!-- Name Field -->
+        <mat-form-field appearance="outline" class="form-field">
+          <mat-label>Full Name</mat-label>
+          <input matInput placeholder="Enter doctor's full name" formControlName="name" required>
+          <mat-icon matSuffix>person</mat-icon>
+          <!-- Error messages -->
+          <mat-error *ngIf="f['name'].touched && f['name'].errors?.['required']">
+            Full Name is required.
+          </mat-error>
+          <mat-error *ngIf="f['name'].touched && f['name'].errors?.['minlength']">
+            Name must be at least 3 characters long.
+          </mat-error>
+        </mat-form-field>
+  
+        <!-- Specialization Field -->
+        <mat-form-field appearance="outline" class="form-field">
+          <mat-label>Specialization</mat-label>
+          <input matInput placeholder="e.g., Cardiologist, Dentist" formControlName="specialization" required>
+           <mat-icon matSuffix>medical_services</mat-icon> <!-- Example icon -->
+           <mat-error *ngIf="f['specialization'].touched && f['specialization'].errors?.['required']">
+            Specialization is required.
+          </mat-error>
+           <mat-error *ngIf="f['specialization'].touched && f['specialization'].errors?.['minlength']">
+             Specialization must be at least 3 characters long.
+           </mat-error>
+        </mat-form-field>
+  
+        <!-- Experience Field -->
+        <mat-form-field appearance="outline" class="form-field">
+          <mat-label>Experience (Years)</mat-label>
+          <!-- Use type="number" -->
+          <input matInput type="number" placeholder="Enter years of experience" formControlName="experience" required min="0">
+           <mat-icon matSuffix>work_history</mat-icon> <!-- Example icon -->
+           <mat-error *ngIf="f['experience'].touched && f['experience'].errors?.['required']">
+             Experience is required.
+           </mat-error>
+           <mat-error *ngIf="f['experience'].touched && f['experience'].errors?.['min']">
+             Experience cannot be negative.
+           </mat-error>
+            <mat-error *ngIf="f['experience'].touched && f['experience'].errors?.['pattern']">
+             Experience must be a whole number.
+           </mat-error>
+        </mat-form-field>
+  
+        <!-- Contact Info Field -->
+        <mat-form-field appearance="outline" class="form-field">
+          <mat-label>Contact Info (Email)</mat-label>
+          <input matInput type="email" placeholder="Enter contact email" formControlName="contact_info" required email>
+           <mat-icon matSuffix>email</mat-icon>
+           <mat-error *ngIf="f['contact_info'].touched && f['contact_info'].errors?.['required']">
+             Contact email is required.
+           </mat-error>
+           <mat-error *ngIf="f['contact_info'].touched && f['contact_info'].errors?.['email']">
+             Please enter a valid email address.
+           </mat-error>
+        </mat-form-field>
+  
+        <!-- Loading Indicator during submit -->
+         <div *ngIf="isLoading" style="text-align: center; padding: 10px;">
+           <mat-spinner diameter="30"></mat-spinner> Processing...
+         </div>
+  
+         <!-- General Form Error Message -->
+         <div *ngIf="errorMessage && !isLoading" class="form-error-message">
+           {{ errorMessage }}
+         </div>
+  
+  
+      </form> <!-- Form tag ends here -->
+    </mat-card-content>
+  
+    <mat-card-actions align="end">
+        <!-- Cancel Button (links back to list) -->
+        <button mat-stroked-button type="button" routerLink="/doctors" [disabled]="isLoading">
+            Cancel
+        </button>
+        <!-- Submit Button -->
+        <!-- Disable button while loading or if form is invalid -->
+        <button mat-raised-button color="primary" type="submit" [disabled]="isLoading || doctorForm.invalid" (click)="onSubmit()">
+            Register Doctor
+        </button>
+    </mat-card-actions>
+  
+  </mat-card>
+  
+  <!-- Basic Styling -->
+  <style>
+    .form-field {
+      width: 100%;
+      margin-bottom: 10px;
+    }
+    .form-error-message {
+       color: red; /* Use theme warn color */
+       padding: 10px 0;
+       text-align: center;
+       font-weight: bold;
+    }
+    /* Simple style for error snackbar if needed */
+    /* Create this globally or in styles.css later */
+    /* .error-snackbar { background-color: #f44336; color: white; } */
+  </style>
