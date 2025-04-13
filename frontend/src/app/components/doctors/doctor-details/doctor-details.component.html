@@ -1,1 +1,87 @@
-<p>doctor-details works!</p>
+<!-- Loading Doctor Details -->
+<div *ngIf="isLoadingDoctor" style="text-align: center; padding: 20px;">
+    <mat-spinner diameter="50"></mat-spinner>
+    <p>Loading doctor details...</p>
+  </div>
+  
+  <!-- Doctor Loading Error -->
+  <div *ngIf="doctorErrorMessage && !isLoadingDoctor" class="error-message">
+    <mat-icon color="warn">error_outline</mat-icon>
+    <span>{{ doctorErrorMessage }}</span>
+    <!-- Optional: Add retry logic if applicable -->
+  </div>
+  
+  <!-- Doctor Details Card (Show only if loaded successfully) -->
+  <mat-card *ngIf="doctor && !isLoadingDoctor">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>person</mat-icon> <!-- Avatar icon -->
+      <mat-card-title>{{ doctor.name }}</mat-card-title>
+      <mat-card-subtitle>{{ doctor.specialization }} ({{ doctor.experience }} years experience)</mat-card-subtitle>
+    </mat-card-header>
+  
+    <mat-card-content>
+      <p>
+        <mat-icon inline>contact_mail</mat-icon> Contact: {{ doctor.contact_info }}
+      </p>
+      <mat-divider></mat-divider>
+  
+      <!-- Availability Section -->
+      <h3 style="margin-top: 20px;">Check Availability</h3>
+  
+      <!-- Date Picker -->
+      <mat-form-field appearance="outline" style="width: 100%;">
+        <mat-label>Choose a date</mat-label>
+        <input matInput [matDatepicker]="picker" placeholder="Select date" (dateChange)="onDateChange($event)" [value]="selectedDate">
+        <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+        <mat-datepicker #picker></mat-datepicker>
+         <mat-error *ngIf="slotErrorMessage && !isLoadingSlots">Error loading slots: {{ slotErrorMessage }}</mat-error>
+      </mat-form-field>
+  
+      <!-- Loading Slots Indicator -->
+       <div *ngIf="isLoadingSlots" style="text-align: center; padding: 10px;">
+         <mat-spinner diameter="30"></mat-spinner> Loading slots...
+       </div>
+  
+      <!-- Available Slots Display (only if date selected, not loading, no error) -->
+      <div *ngIf="selectedDate && !isLoadingSlots && !slotErrorMessage" style="margin-top: 10px;">
+         <p *ngIf="availableSlots.length === 0">No available slots for this date.</p>
+  
+         <mat-chip-listbox aria-label="Available time slots">
+             <mat-chip-option *ngFor="let slot of availableSlots" (click)="bookSlot(slot)" color="primary">
+                 <!-- Format time using DatePipe -->
+                {{ slot.start_time | date:'shortTime' }} 
+                <!-- Example: 9:00 AM -->
+             </mat-chip-option>
+         </mat-chip-listbox>
+      </div>
+  
+    </mat-card-content>
+  
+     <mat-card-actions>
+        <button mat-stroked-button routerLink="/doctors">
+            <mat-icon>arrow_back</mat-icon> Back to List
+        </button>
+        <!-- Add Edit/Manage button later if implementing doctor management view -->
+     </mat-card-actions>
+  
+  </mat-card>
+  
+  <!-- Basic Error Styling -->
+  <style>
+    .error-message {
+      color: red;
+      background-color: #fff0f0;
+      padding: 15px;
+      margin: 10px 0;
+      border: 1px solid red;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    mat-chip-listbox {
+       display: flex;
+       flex-wrap: wrap;
+       gap: 8px;
+    }
+  </style>
