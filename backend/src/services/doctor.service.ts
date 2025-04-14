@@ -1,98 +1,142 @@
 import pool from '../config/database';
-import { RowDataPacket, OkPacket } from 'mysql2/promise';
-import { randomBytes } from 'crypto';
+import { RowDataPacket, OkPacket } from 'mysql2/promise'; 
+import { randomBytes } from 'crypto'; // For generating the management token
 
-// Define an interface for the Doctor object
-// Make management_token explicitly optional string | undefined
+// --- Interfaces ---
 export interface Doctor {
     id: number;
     name: string;
     specialization: string;
     experience: number;
     contact_info: string;
-    management_token?: string | undefined; // Explicitly allow undefined
+    management_token?: string | undefined; 
     created_at?: Date;
     updated_at?: Date;
 }
 
-// Interface for incoming data (token generated internally)
-export interface DoctorInput {
+export interface DoctorInput { 
     name: string;
     specialization: string;
     experience: number;
     contact_info: string;
 }
 
+// --- Helper function (ensure it's defined or imported) ---
+const getDoctorIdByToken = async (token: string): Promise<number | null> => {
+    try {
+        const [rows] = await pool.query<RowDataPacket[]>('SELECT id FROM Doctors WHERE management_token = ?', [token]);
+        return rows.length > 0 ? rows[0].id : null;
+    } catch (error) {
+        console.error(`[Service Error]: Error fetching doctor ID for token ${token}:`, error);
+        return null; 
+    }
+};
+
 // --- GET ALL DOCTORS ---
-// Ensure this function has its full body and returns correctly
-export const getAllDoctors = async (): Promise<Doctor[]> => {
+export const getAllDoctors = async (): Promise<Doctor[]> => { 
     try {
         const query = 'SELECT id, name, specialization, experience, contact_info, created_at, updated_at FROM Doctors';
         const [rows] = await pool.query<RowDataPacket[]>(query);
-        return rows as Doctor[]; // Return the rows
+        return rows as Doctor[]; 
     } catch (error) {
         console.error('[Service Error]: Error fetching all doctors:', error);
         throw new Error('Failed to fetch doctors from database.');
     }
-}; // <-- Make sure the closing brace } is here
+};
 
-
-// --- CREATE DOCTOR ---
+// --- CREATE DOCTOR (with Default Availability Blocks) ---
 export const createDoctor = async (doctorInput: DoctorInput): Promise<Doctor> => {
     const { name, specialization, experience, contact_info } = doctorInput;
-    const managementToken = randomBytes(32).toString('hex');
+    const managementToken = randomBytes(32).toString('hex'); 
+
+    // Use a transaction to ensure doctor and blocks are created together or not at all
+    const connection = await pool.getConnection(); // Get a connection from the pool
+    await connection.beginTransaction(); // Start transaction
 
     try {
-        const query = `
-            INSERT INTO Doctors (name, specialization, experience, contact_info, management_token)
+        // 1. Insert Doctor
+        const doctorQuery = `
+            INSERT INTO Doctors (name, specialization, experience, contact_info, management_token) 
             VALUES (?, ?, ?, ?, ?)
         `;
-        const values = [name, specialization, experience, contact_info, managementToken];
+        const doctorValues = [name, specialization, experience, contact_info, managementToken];
+        const [result] = await connection.query<OkPacket>(doctorQuery, doctorValues); // Use connection for query
 
-        const [result] = await pool.query<OkPacket>(query, values);
-
-        if (result.insertId) {
-            const [newDoctorRows] = await pool.query<RowDataPacket[]>(
-                'SELECT id, name, specialization, experience, contact_info, created_at, updated_at FROM Doctors WHERE id = ?',
-                [result.insertId]
-            );
-            if (newDoctorRows.length > 0) {
-                // Cast the retrieved row to Doctor first
-                const createdDoctor = newDoctorRows[0] as Doctor;
-                // Now assign the token (TS allows assigning to optional properties)
-                createdDoctor.management_token = managementToken;
-                return createdDoctor; // Return the complete object
-            } else {
-                 throw new Error('Failed to retrieve newly created doctor.');
-            }
-        } else {
-            throw new Error('Failed to insert new doctor.');
+        if (!result.insertId) {
+             throw new Error('Failed to insert new doctor.');
         }
+        
+        const newDoctorId = result.insertId;
+
+        // 2. Add Default Availability Blocks (Mon-Sat, 9am-5pm) using the same connection
+        console.log(`[Service Info] Adding default availability blocks for new doctor ID: ${newDoctorId}`);
+        const defaultStartTime = '09:00:00';
+        const defaultEndTime = '17:00:00'; // 5 PM
+        const blockQuery = `
+            INSERT INTO AvailabilityBlocks (doctor_id, day_of_week, start_time, end_time) 
+            VALUES (?, ?, ?, ?)
+        `;
+        // Loop through Monday (1) to Saturday (6)
+        for (let day = 1; day <= 6; day++) {
+            try {
+                // Use connection.query within the transaction
+                await connection.query(blockQuery, [newDoctorId, day, defaultStartTime, defaultEndTime]); 
+                console.log(`[Service Info] Added block for Dr ${newDoctorId}, Day: ${day}`);
+            } catch (blockError) {
+                // If adding a block fails, log it, but we might still commit the doctor record
+                // Or choose to rollback the entire transaction by re-throwing
+                console.error(`[Service Error] Failed to add default block for Dr ${newDoctorId}, Day: ${day}:`, blockError);
+                 // OPTIONAL: Decide if block failure should prevent doctor creation
+                 // throw new Error(`Failed to add default availability block for day ${day}.`); 
+            }
+        }
+        
+        // 3. Commit Transaction
+        await connection.commit(); 
+        console.log(`[Service Info] Doctor ${newDoctorId} and default blocks committed.`);
+
+        // 4. Fetch and return the created doctor (optional but good practice)
+        // We can use the main pool now, or keep using the connection
+        const [newDoctorRows] = await pool.query<RowDataPacket[]>(
+             'SELECT id, name, specialization, experience, contact_info, created_at, updated_at FROM Doctors WHERE id = ?',
+             [newDoctorId]
+         );
+         if (newDoctorRows.length > 0) {
+              const createdDoctor = newDoctorRows[0] as Doctor;
+              createdDoctor.management_token = managementToken; // Add token back for response
+              return createdDoctor;
+         } else {
+              // This shouldn't happen if insert succeeded, but handle defensively
+              throw new Error('Failed to retrieve newly created doctor after commit.');
+         }
+
     } catch (error) {
-        console.error('[Service Error]: Error creating doctor:', error);
+        // If any error occurred during the transaction, rollback changes
+        await connection.rollback(); 
+        console.error('[Service Error]: Error creating doctor or default blocks, transaction rolled back:', error);
+        // Refine error message based on type if needed
         if (error instanceof Error && 'code' in error && error.code === 'ER_DUP_ENTRY') {
-             throw new Error('Failed to create doctor due to a duplicate entry. Please try again.');
+             throw new Error('Failed to create doctor due to a duplicate entry (possibly token collision). Please try again.');
         }
         throw new Error('Failed to create doctor in database.');
+    } finally {
+         // VERY Important: Release the connection back to the pool
+         connection.release(); 
+         console.log("[DB Info] Connection released.");
     }
-}; // <-- Make sure the closing brace } is here
+};
+
 
 // --- GET DOCTOR BY ID ---
 export const getDoctorById = async (id: number): Promise<Doctor | null> => {
     try {
-        // Select all fields EXCEPT management_token for public view
         const query = `
             SELECT id, name, specialization, experience, contact_info, created_at, updated_at 
             FROM Doctors 
             WHERE id = ?
-        `;
+        `; 
         const [rows] = await pool.query<RowDataPacket[]>(query, [id]);
-
-        if (rows.length > 0) {
-            return rows[0] as Doctor; // Return the found doctor
-        } else {
-            return null; // Return null if no doctor found with that ID
-        }
+        return rows.length > 0 ? (rows[0] as Doctor) : null; 
     } catch (error) {
         console.error(`[Service Error]: Error fetching doctor with ID ${id}:`, error);
         throw new Error('Failed to fetch doctor from database.');
@@ -101,42 +145,21 @@ export const getDoctorById = async (id: number): Promise<Doctor | null> => {
 
 // --- UPDATE DOCTOR BY TOKEN ---
 export const updateDoctorByToken = async (token: string, doctorUpdateInput: Partial<DoctorInput>): Promise<Doctor | null> => {
-    // We use Partial<DoctorInput> because the user might only want to update some fields
     const { name, specialization, experience, contact_info } = doctorUpdateInput;
-
-    // Construct the SET part of the query dynamically based on provided fields
     const setClauses: string[] = [];
     const values: (string | number | undefined)[] = [];
 
-    if (name !== undefined) {
-        setClauses.push('name = ?');
-        values.push(name);
-    }
-    if (specialization !== undefined) {
-        setClauses.push('specialization = ?');
-        values.push(specialization);
-    }
-    if (experience !== undefined) {
-        setClauses.push('experience = ?');
-        values.push(experience);
-    }
-    if (contact_info !== undefined) {
-        setClauses.push('contact_info = ?');
-        values.push(contact_info);
-    }
+    if (name !== undefined) { setClauses.push('name = ?'); values.push(name); }
+    if (specialization !== undefined) { setClauses.push('specialization = ?'); values.push(specialization); }
+    if (experience !== undefined) { setClauses.push('experience = ?'); values.push(experience); }
+    if (contact_info !== undefined) { setClauses.push('contact_info = ?'); values.push(contact_info); }
 
-    // Do nothing if no valid fields were provided for update
     if (setClauses.length === 0) {
-        // Optionally, fetch and return the current doctor data without updating
-        // Or return null/throw error indicating no update was made
         console.warn(`[Service Warning]: No valid fields provided for update with token ${token}`);
-         // Let's fetch the current data in this case
          const [currentDoctorRows] = await pool.query<RowDataPacket[]>('SELECT id, name, specialization, experience, contact_info, created_at, updated_at FROM Doctors WHERE management_token = ?', [token]);
          return currentDoctorRows.length > 0 ? (currentDoctorRows[0] as Doctor) : null;
     }
-
-    // Add the management token to the values array for the WHERE clause
-    values.push(token);
+    values.push(token); // Add token for WHERE clause
 
     try {
         const query = `
@@ -144,19 +167,16 @@ export const updateDoctorByToken = async (token: string, doctorUpdateInput: Part
             SET ${setClauses.join(', ')}, updated_at = CURRENT_TIMESTAMP 
             WHERE management_token = ?
         `;
-
         const [result] = await pool.query<OkPacket>(query, values);
 
         if (result.affectedRows > 0) {
-            // If update was successful, fetch the updated doctor data to return
             const [updatedDoctorRows] = await pool.query<RowDataPacket[]>(
                 'SELECT id, name, specialization, experience, contact_info, created_at, updated_at FROM Doctors WHERE management_token = ?',
                 [token]
             );
-            return updatedDoctorRows.length > 0 ? (updatedDoctorRows[0] as Doctor) : null; // Should exist if update worked
+            return updatedDoctorRows.length > 0 ? (updatedDoctorRows[0] as Doctor) : null; 
         } else {
-            // No rows affected - likely means the token was invalid
-            return null;
+            return null; // Token invalid / no update occurred
         }
     } catch (error) {
         console.error(`[Service Error]: Error updating doctor with token ${token}:`, error);
@@ -167,26 +187,15 @@ export const updateDoctorByToken = async (token: string, doctorUpdateInput: Part
 
 // --- DELETE DOCTOR BY TOKEN ---
 export const deleteDoctorByToken = async (token: string): Promise<boolean> => {
-    // Returns true if deletion was successful, false otherwise
     try {
-        const query = `
-            DELETE FROM Doctors 
-            WHERE management_token = ?
-        `;
-        
-        // DELETE query also returns OkPacket
+        const query = `DELETE FROM Doctors WHERE management_token = ?`;
         const [result] = await pool.query<OkPacket>(query, [token]);
-
-        // Check if any row was actually deleted
         return result.affectedRows > 0; 
-
     } catch (error) {
         console.error(`[Service Error]: Error deleting doctor with token ${token}:`, error);
-        // Specific check for foreign key constraint violation (if doctor has appointments)
-        // MySQL error code for foreign key constraint failure is often 1451
         if (error instanceof Error && 'code' in error && (error as any).errno === 1451) {
              console.warn(`[Service Warning]: Attempted to delete doctor with token ${token} who has existing appointments.`);
-             throw new Error('Cannot delete doctor: Doctor has existing appointments. Please cancel or reassign appointments first.'); // More specific error
+             throw new Error('Cannot delete doctor: Doctor has existing appointments. Please cancel or reassign appointments first.'); 
         }
         throw new Error('Failed to delete doctor from database.');
     }
