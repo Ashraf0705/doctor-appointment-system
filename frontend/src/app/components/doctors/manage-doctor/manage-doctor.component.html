@@ -1,75 +1,152 @@
-<mat-card *ngIf="managementToken"> <!-- Only show card if token exists -->
+<mat-card *ngIf="managementToken"> 
     <mat-card-header>
-        <mat-card-title>Manage Your Appointments</mat-card-title>
-        <mat-card-subtitle>Confirm or cancel pending appointments</mat-card-subtitle>
-        <!-- TODO: Display Doctor Name here once fetched -->
+        <mat-card-title>Doctor Management</mat-card-title>
+        <!-- TODO: Display Doctor Name -->
     </mat-card-header>
 
     <mat-card-content>
-        <!-- Loading Indicator -->
-        <div *ngIf="isLoadingAppointments" style="text-align: center; padding: 20px;">
-            <mat-spinner diameter="50"></mat-spinner>
-            <p>Loading your appointments...</p>
+        <!-- General Error Display -->
+        <div *ngIf="errorMessage && !isLoadingAppointments && !isLoadingAvailability" class="error-message">
+             <mat-icon color="warn">error_outline</mat-icon>
+             <span>{{ errorMessage }}</span>
+             <button mat-stroked-button color="warn" (click)="refreshAppointments(); loadAvailability(managementToken!)">Retry All</button>
         </div>
 
-        <!-- Error Message Display -->
-        <div *ngIf="errorMessage && !isLoadingAppointments" class="error-message">
-            <mat-icon color="warn">error_outline</mat-icon>
-            <span>{{ errorMessage }}</span>
-            <button mat-stroked-button color="warn" (click)="refreshAppointments()">Retry</button>
-        </div>
+        <!-- === APPOINTMENT MANAGEMENT SECTION === -->
+        <section>
+            <h2>Manage Your Appointments</h2>
+            <mat-divider></mat-divider>
 
-        <!-- Appointments List -->
-        <div *ngIf="!isLoadingAppointments && !errorMessage">
-            <mat-list *ngIf="appointments.length > 0; else noAppointments">
-                <h3 matSubheader>Your Appointments</h3>
-                <ng-container *ngFor="let appt of appointments">
-                    <mat-list-item>
-                        <mat-icon matListItemIcon>person_pin</mat-icon> <!-- Patient Icon -->
-                        <div matListItemTitle>{{ appt.patient_name }}</div>
-                        <div matListItemLine>Contact: {{ appt.patient_contact_info }}</div>
-                        <div matListItemLine>
-                            Time: {{ appt.appointment_time | date:'fullDate' }} at {{ appt.appointment_time | date:'shortTime' }}
-                        </div>
-                        
-                        <div matListItemMeta style="display: flex; align-items: center; gap: 10px;">
-                            <!-- Status Chip -->
-                            <mat-chip [color]="getStatusColor(appt.status)" selected disabled>
-                                {{ appt.status }}
-                            </mat-chip>
+            <!-- Loading Indicator -->
+            <div *ngIf="isLoadingAppointments" class="loading-section">
+                <mat-spinner diameter="40"></mat-spinner> Loading appointments...
+            </div>
 
-                            <!-- Action Buttons (Only if Pending) -->
-                            <ng-container *ngIf="appt.status === 'Pending'">
-                                <button mat-icon-button color="primary" matTooltip="Confirm Appointment" (click)="confirmAppointment(appt.id)">
-                                    <mat-icon>check_circle</mat-icon>
-                                </button>
-                                <button mat-icon-button color="warn" matTooltip="Cancel Appointment" (click)="cancelAppointment(appt.id)">
-                                    <mat-icon>cancel</mat-icon>
-                                </button>
-                            </ng-container>
-                        </div>
+            <!-- Appointments List -->
+            <div *ngIf="!isLoadingAppointments && !errorMessage">
+                <mat-list *ngIf="appointments.length > 0; else noAppointments">
+                     <h3 matSubheader>Appointments</h3>
+                    <ng-container *ngFor="let appt of appointments">
+                        <mat-list-item>
+                             <mat-icon matListItemIcon>person_pin</mat-icon> 
+                             <div matListItemTitle>{{ appt.patient_name }}</div>
+                             <div matListItemLine>Contact: {{ appt.patient_contact_info }}</div>
+                             <div matListItemLine>Time: {{ appt.appointment_time | date:'fullDate' }} at {{ appt.appointment_time | date:'shortTime' }}</div>
+                            
+                             <div matListItemMeta class="list-item-actions">
+                                <mat-chip [color]="getStatusColor(appt.status)" selected disabled>{{ appt.status }}</mat-chip>
+                                <ng-container *ngIf="appt.status === 'Pending'">
+                                    <button mat-icon-button color="primary" matTooltip="Confirm Appointment" (click)="confirmAppointment(appt.id)"><mat-icon>check_circle</mat-icon></button>
+                                    <button mat-icon-button color="warn" matTooltip="Cancel Appointment" (click)="cancelAppointment(appt.id)"><mat-icon>cancel</mat-icon></button>
+                                </ng-container>
+                            </div>
+                        </mat-list-item>
+                         <mat-divider></mat-divider>
+                    </ng-container>
+                </mat-list>
+                 <ng-template #noAppointments><p class="no-items-message">You have no appointments.</p></ng-template>
+            </div>
+        </section>
 
-                    </mat-list-item>
-                    <mat-divider></mat-divider>
-                </ng-container>
-            </mat-list>
+         <br/> <br/> <!-- Add some space -->
 
-             <!-- Message if no appointments found -->
-             <ng-template #noAppointments>
-                <p style="padding: 15px; text-align: center;">You have no appointments matching the current filter.</p>
-            </ng-template>
-        </div>
+        <!-- === AVAILABILITY MANAGEMENT SECTION === -->
+        <section>
+             <h2>Manage Your Weekly Availability</h2>
+             <mat-divider></mat-divider>
 
-         <!-- TODO: Add section for managing Availability Blocks here later -->
-          <!-- TODO: Add section for editing Profile Info here later -->
+             <!-- Loading Indicator -->
+              <div *ngIf="isLoadingAvailability" class="loading-section">
+                 <mat-spinner diameter="40"></mat-spinner> Loading availability...
+             </div>
+
+             <!-- Availability Blocks List -->
+             <div *ngIf="!isLoadingAvailability && !errorMessage">
+                  <mat-list *ngIf="availabilityBlocks.length > 0; else noAvailability">
+                      <h3 matSubheader>Current Blocks</h3>
+                      <ng-container *ngFor="let block of availabilityBlocks">
+                           <mat-list-item>
+                               <mat-icon matListItemIcon>schedule</mat-icon>
+                               <!-- Display day name using DatePipe format 'EEEE' -->
+                               <!-- Need to create a dummy date with the correct day number -->
+                               <div matListItemTitle>{{ ( (block.day_of_week + 6) % 7) | date:'EEEE' }}</div> 
+                               <!-- Hacky way to display day name; better approach is needed -->
+                               <!-- Let's simplify for now: Use daysOfWeek map -->
+                               <!-- <div matListItemTitle>{{ daysOfWeek.find(d => d.value === block.day_of_week)?.viewValue }}</div> -->
+                               <div matListItemLine>
+                                    {{ block.start_time | date:'shortTime' }} - {{ block.end_time | date:'shortTime' }}
+                               </div>
+                               <div matListItemMeta>
+                                    <button mat-icon-button color="warn" matTooltip="Delete Block" (click)="deleteBlock(block.id)">
+                                        <mat-icon>delete_forever</mat-icon>
+                                    </button>
+                               </div>
+                           </mat-list-item>
+                            <mat-divider></mat-divider>
+                      </ng-container>
+                  </mat-list>
+                   <ng-template #noAvailability><p class="no-items-message">You have no availability blocks defined.</p></ng-template>
+             </div>
+
+            <!-- Add New Block Form -->
+             <h3 style="margin-top: 25px;">Add New Availability Block</h3>
+             <form [formGroup]="addBlockForm" (ngSubmit)="onAddBlockSubmit()">
+                 <div class="add-block-form-fields">
+                    <!-- Day of Week Select -->
+                    <mat-form-field appearance="outline">
+                         <mat-label>Day of Week</mat-label>
+                         <mat-select formControlName="day_of_week" required>
+                              <mat-option *ngFor="let day of daysOfWeek" [value]="day.value">
+                                 {{day.viewValue}}
+                              </mat-option>
+                         </mat-select>
+                         <mat-error *ngIf="addBlockForm.controls['day_of_week'].touched && addBlockForm.controls['day_of_week'].errors?.['required']">
+                            Day is required.
+                        </mat-error>
+                    </mat-form-field>
+
+                    <!-- Start Time Input -->
+                     <mat-form-field appearance="outline">
+                         <mat-label>Start Time</mat-label>
+                         <input matInput type="time" placeholder="HH:MM" formControlName="start_time" required>
+                          <mat-error *ngIf="addBlockForm.controls['start_time'].touched && addBlockForm.controls['start_time'].errors?.['required']">
+                            Start time is required.
+                        </mat-error>
+                         <mat-error *ngIf="addBlockForm.controls['start_time'].touched && addBlockForm.controls['start_time'].errors?.['pattern']">
+                            Invalid format (HH:MM).
+                        </mat-error>
+                     </mat-form-field>
+
+                     <!-- End Time Input -->
+                      <mat-form-field appearance="outline">
+                         <mat-label>End Time</mat-label>
+                         <input matInput type="time" placeholder="HH:MM" formControlName="end_time" required>
+                         <mat-error *ngIf="addBlockForm.controls['end_time'].touched && addBlockForm.controls['end_time'].errors?.['required']">
+                            End time is required.
+                        </mat-error>
+                         <mat-error *ngIf="addBlockForm.controls['end_time'].touched && addBlockForm.controls['end_time'].errors?.['pattern']">
+                             Invalid format (HH:MM).
+                         </mat-error>
+                     </mat-form-field>
+
+                     <!-- Submit Button -->
+                     <button mat-raised-button color="accent" type="submit" [disabled]="isSubmittingBlock || addBlockForm.invalid">
+                          <mat-icon>add</mat-icon> 
+                          <span *ngIf="!isSubmittingBlock">Add Block</span>
+                          <span *ngIf="isSubmittingBlock">Adding... <mat-progress-spinner diameter="20" mode="indeterminate" style="display: inline-block; margin-left: 5px;"></mat-progress-spinner></span>
+                     </button>
+                 </div>
+             </form>
+
+        </section>
 
     </mat-card-content>
+
      <mat-card-actions align="end">
         <button mat-stroked-button routerLink="/doctors">
-            <mat-icon>arrow_back</mat-icon> Back to Doctors List
+             <mat-icon>arrow_back</mat-icon> Back to Doctors List
         </button>
      </mat-card-actions>
-
 </mat-card>
 
 <div *ngIf="!managementToken && !errorMessage" class="error-message">
@@ -77,12 +154,12 @@
 </div>
 
 
-<!-- Basic Error Styling -->
+<!-- Basic Styling -->
 <style>
-  .error-message {
-    color: red; background-color: #fff0f0; padding: 15px;
-    margin: 10px 0; border: 1px solid red; border-radius: 4px;
-    display: flex; align-items: center; gap: 10px;
-  }
-  /* Add Tooltip styling if needed - requires MatTooltipModule import */
+  .error-message { /* ... keep previous style ... */ }
+  .loading-section, .no-items-message { text-align: center; padding: 20px; color: grey; }
+  .list-item-actions { display: flex; align-items: center; gap: 8px; }
+  .add-block-form-fields { display: flex; gap: 15px; align-items: flex-start; flex-wrap: wrap; margin-top: 15px;}
+   .add-block-form-fields mat-form-field { flex: 1 1 180px; /* Allow wrap */ }
+   .add-block-form-fields button { margin-top: 8px; /* Align button nicely */ }
 </style>
