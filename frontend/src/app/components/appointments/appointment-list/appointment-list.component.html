@@ -23,31 +23,28 @@
         <div *ngIf="!isLoading && !errorMessage">
             <mat-list *ngIf="appointments.length > 0; else noAppointments">
                 <h3 matSubheader>Appointments</h3>
-                <mat-list-item *ngFor="let appt of appointments">
-                    <mat-icon matListItemIcon>event</mat-icon>
-                    <div matListItemTitle>
-                        {{ appt.patient_name }} 
-                        <!-- Optional: Display doctor name instead of ID -->
-                        <!-- (with {{ getDoctorName(appt.doctor_id) }}) -->
-                         (Doctor ID: {{ appt.doctor_id }})
-                    </div>
-                    <div matListItemLine>
-                        {{ appt.appointment_time | date:'fullDate' }} at {{ appt.appointment_time | date:'shortTime' }} 
-                        <!-- Example: Wednesday, April 9, 2025 at 10:30 AM -->
-                    </div>
-                    <!-- Status Chip -->
-                    <div matListItemMeta>
-                       <mat-chip [color]="getStatusColor(appt.status)" selected disabled>
-                            {{ appt.status }}
-                        </mat-chip>
-                    </div>
-                     <!-- Optional: Add button to view details or cancel -->
-                     <!-- <button mat-icon-button color="primary" [routerLink]="['/appointments', appt.id]">
-                         <mat-icon>visibility</mat-icon>
-                     </button> -->
-
-                </mat-list-item>
-                 <mat-divider></mat-divider>
+                <ng-container *ngFor="let appt of appointments">
+                    <mat-list-item>
+                        <mat-icon matListItemIcon>event</mat-icon>
+                        <div matListItemTitle>
+                            {{ appt.patient_name }} 
+                            <!-- *** MODIFIED LINE *** -->
+                            <!-- Display doctor name if available, otherwise fallback to ID -->
+                            (with {{ appt.doctor_name || ('Doctor ID: ' + appt.doctor_id) }}) 
+                            <!-- *** END MODIFIED LINE *** -->
+                        </div>
+                        <div matListItemLine>
+                            {{ appt.appointment_time | date:'fullDate' }} at {{ appt.appointment_time | date:'shortTime' }} 
+                        </div>
+                        <!-- Status Chip -->
+                        <div matListItemMeta>
+                           <mat-chip [color]="getStatusColor(appt.status)" selected disabled>
+                                {{ appt.status }}
+                            </mat-chip>
+                        </div>
+                    </mat-list-item>
+                     <mat-divider></mat-divider>
+                </ng-container>
             </mat-list>
 
             <!-- Message if no appointments found -->

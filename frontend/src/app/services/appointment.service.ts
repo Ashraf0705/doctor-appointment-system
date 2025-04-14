@@ -14,6 +14,7 @@ export interface Appointment {
     cancellation_code?: string | null; 
     created_at?: string;
     updated_at?: string;
+    doctor_name?: string; // <-- ADDED Property to expect doctor's name
 }
 
 export interface AppointmentInput {
@@ -29,6 +30,7 @@ interface ApiResponse<T> {
   message?: string;
   data: T;
 }
+
 
 @Injectable({
   providedIn: 'root'
@@ -46,15 +48,15 @@ export class AppointmentService {
       );
   }
 
-  // --- GET All Appointments --- // MODIFIED to accept optional token
+  // --- GET All Appointments --- 
   getAllAppointments(managementToken?: string): Observable<Appointment[]> {
      let params = new HttpParams();
      if (managementToken) {
-        // Add token as query parameter if provided
         params = params.set('managementToken', managementToken); 
      }
      console.log(`[Frontend Appt Service] Fetching appointments. Token provided: ${managementToken ? 'Yes' : 'No'}`);
-     return this.http.get<ApiResponse<{ appointments: Appointment[] }>>(this.apiUrl, { params }) // Pass params
+     // The backend now returns doctor_name, the interface expects it, map extracts it.
+     return this.http.get<ApiResponse<{ appointments: Appointment[] }>>(this.apiUrl, { params }) 
        .pipe(
          map(response => response.data.appointments),
          catchError(this.handleError)
@@ -64,6 +66,7 @@ export class AppointmentService {
    // --- GET Appointment By ID ---
    getAppointmentById(id: number): Observable<Appointment> {
      const url = `${this.apiUrl}/${id}`;
+      // Backend now returns doctor_name, interface expects it, map extracts it.
      return this.http.get<ApiResponse<{ appointment: Appointment }>>(url)
        .pipe(
          map(response => response.data.appointment),
@@ -87,7 +90,6 @@ export class AppointmentService {
        let params = new HttpParams().set('managementToken', managementToken);
        const body = { status };
        console.log(`[Frontend Appt Service] Updating status for Appt ID: ${id} to ${status} using token.`);
-
        return this.http.put<ApiResponse<null>>(url, body, { params })
        .pipe(
             map(response => ({ status: response.status, message: response.message || 'Status updated' })),

@@ -24,6 +24,8 @@ export interface Appointment {
     cancellation_code?: string | null; 
     created_at?: Date;
     updated_at?: Date;
+    // We add doctor_name dynamically in getAllAppointments, so it doesn't strictly need to be here
+    // but the frontend interface should expect it optionally.
 }
 
 export interface AppointmentInput {
@@ -100,42 +102,66 @@ export const bookAppointment = async (input: AppointmentInput): Promise<Appointm
     }
 };
 
-// --- GET ALL APPOINTMENTS (with optional token filter) --- // MODIFIED
+// --- GET ALL APPOINTMENTS (with optional token filter AND Doctor Name) --- // *** MODIFIED ***
 export const getAllAppointments = async (filterToken?: string): Promise<Appointment[]> => {
+    console.log(`\n--- [Backend Appt Service - getAllAppointments] ---`);
+    console.log(`[Backend Appt Service] Received filterToken:`, filterToken); 
     try {
+        // Select appointment fields AND doctor's name using JOIN
         let query = `
-            SELECT id, doctor_id, patient_name, patient_contact_info, appointment_time, status, created_at, updated_at 
-            FROM Appointments 
-        `; // Base query
+            SELECT 
+                A.id, A.doctor_id, A.patient_name, A.patient_contact_info, 
+                A.appointment_time, A.status, A.created_at, A.updated_at,
+                D.name as doctor_name 
+            FROM Appointments A 
+            JOIN Doctors D ON A.doctor_id = D.id 
+        `; // Base query with JOIN
         const queryParams: (string | number)[] = [];
 
         if (filterToken) {
             // If token provided, filter by doctor_id associated with that token
             const doctorId = await getDoctorIdByToken(filterToken);
+            console.log(`[Backend Appt Service] Doctor ID found for token:`, doctorId); 
             if (doctorId) {
-                query += ` WHERE doctor_id = ?`; // Add WHERE clause
+                query += ` WHERE A.doctor_id = ?`; // Add WHERE clause (prefix with table alias A)
                 queryParams.push(doctorId);
-                console.log(`[Service Info] Filtering appointments for Doctor ID: ${doctorId} based on token.`);
             } else {
-                console.warn(`[Service Warn] Invalid token provided for filtering appointments.`);
-                return []; // Return empty if token invalid - unauthorized essentially
+                console.warn(`[Backend Appt Service] Invalid token provided for filtering appointments.`);
+                console.log(`--- [Backend Appt Service End] ---\n`);
+                return []; // Return empty if token invalid
             }
         }
         
-        query += ` ORDER BY appointment_time DESC`; // Add ORDER BY at the end
+        query += ` ORDER BY A.appointment_time DESC`; // Add ORDER BY at the end, prefix with alias
+
+        console.log(`[Backend Appt Service] Executing Query: ${query.replace(/\s+/g, ' ')} with params:`, queryParams); 
 
         const [rows] = await pool.query<RowDataPacket[]>(query, queryParams);
-        return rows as Appointment[];
+        console.log(`[Backend Appt Service] Query returned ${rows.length} rows.`); 
+        console.log(`--- [Backend Appt Service End] ---\n`);
+        // Rows now include doctor_name. Cast to Appointment[] which frontend expects.
+        return rows as Appointment[]; 
     } catch (error) {
         console.error('[Service Error]: Error fetching appointments:', error);
+        console.log(`--- [Backend Appt Service End with Error] ---\n`);
         throw new Error('Failed to fetch appointments.');
     }
 };
+// --- End Modified Function ---
 
-// --- GET APPOINTMENT BY ID ---
+// --- GET APPOINTMENT BY ID --- // *** MODIFIED to potentially include doctor_name ***
 export const getAppointmentById = async (id: number): Promise<Appointment | null> => {
     try {
-        const query = `SELECT id, doctor_id, patient_name, patient_contact_info, appointment_time, status, created_at, updated_at FROM Appointments WHERE id = ?`; 
+        // Also join with Doctors table here to get name
+        const query = `
+            SELECT 
+                A.id, A.doctor_id, A.patient_name, A.patient_contact_info, 
+                A.appointment_time, A.status, A.created_at, A.updated_at,
+                D.name as doctor_name 
+            FROM Appointments A
+            JOIN Doctors D ON A.doctor_id = D.id 
+            WHERE A.id = ?
+        `; 
         const [rows] = await pool.query<RowDataPacket[]>(query, [id]);
         return rows.length > 0 ? (rows[0] as Appointment) : null; 
     } catch (error) {
@@ -143,6 +169,8 @@ export const getAppointmentById = async (id: number): Promise<Appointment | null
         throw new Error('Failed to fetch appointment.');
     }
 };
+// --- End Modified Function ---
+
 
 // --- CANCEL APPOINTMENT BY CANCELLATION CODE ---
 export const cancelAppointmentByCode = async (code: string): Promise<boolean> => {
