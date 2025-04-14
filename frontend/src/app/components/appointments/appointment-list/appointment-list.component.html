@@ -1,1 +1,80 @@
-<p>appointment-list works!</p>
+<mat-card>
+    <mat-card-header>
+        <mat-card-title>All Appointments</mat-card-title>
+         <mat-card-subtitle>List of booked appointments</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+
+        <!-- Loading Indicator -->
+        <div *ngIf="isLoading" style="text-align: center; padding: 20px;">
+            <mat-spinner diameter="50"></mat-spinner>
+            <p>Loading appointments...</p>
+        </div>
+
+        <!-- Error Message Display -->
+        <div *ngIf="errorMessage && !isLoading" class="error-message">
+            <mat-icon color="warn">error_outline</mat-icon>
+            <span>{{ errorMessage }}</span>
+             <button mat-stroked-button color="warn" (click)="loadAppointments()">Retry</button>
+        </div>
+
+        <!-- Appointments List -->
+        <div *ngIf="!isLoading && !errorMessage">
+            <mat-list *ngIf="appointments.length > 0; else noAppointments">
+                <h3 matSubheader>Appointments</h3>
+                <mat-list-item *ngFor="let appt of appointments">
+                    <mat-icon matListItemIcon>event</mat-icon>
+                    <div matListItemTitle>
+                        {{ appt.patient_name }} 
+                        <!-- Optional: Display doctor name instead of ID -->
+                        <!-- (with {{ getDoctorName(appt.doctor_id) }}) -->
+                         (Doctor ID: {{ appt.doctor_id }})
+                    </div>
+                    <div matListItemLine>
+                        {{ appt.appointment_time | date:'fullDate' }} at {{ appt.appointment_time | date:'shortTime' }} 
+                        <!-- Example: Wednesday, April 9, 2025 at 10:30 AM -->
+                    </div>
+                    <!-- Status Chip -->
+                    <div matListItemMeta>
+                       <mat-chip [color]="getStatusColor(appt.status)" selected disabled>
+                            {{ appt.status }}
+                        </mat-chip>
+                    </div>
+                     <!-- Optional: Add button to view details or cancel -->
+                     <!-- <button mat-icon-button color="primary" [routerLink]="['/appointments', appt.id]">
+                         <mat-icon>visibility</mat-icon>
+                     </button> -->
+
+                </mat-list-item>
+                 <mat-divider></mat-divider>
+            </mat-list>
+
+            <!-- Message if no appointments found -->
+            <ng-template #noAppointments>
+                <p style="padding: 15px; text-align: center;">No appointments found.</p>
+            </ng-template>
+        </div>
+
+    </mat-card-content>
+     <mat-card-actions align="end">
+        <button mat-raised-button color="primary" routerLink="/doctors">
+            <mat-icon>add</mat-icon> Book New Appointment
+        </button>
+     </mat-card-actions>
+</mat-card>
+
+<!-- Basic Error Styling -->
+<style>
+  .error-message {
+    color: red;
+    background-color: #fff0f0;
+    padding: 15px;
+    margin: 10px 0;
+    border: 1px solid red;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+</style>

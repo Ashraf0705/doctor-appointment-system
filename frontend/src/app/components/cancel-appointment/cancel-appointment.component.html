@@ -1,0 +1,49 @@
+<mat-card>
+    <mat-card-header>
+        <mat-card-title>Cancel Your Appointment</mat-card-title>
+        <mat-card-subtitle>Enter the cancellation code provided during booking</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+        <form [formGroup]="cancelForm" (ngSubmit)="onSubmit()">
+
+            <mat-form-field appearance="outline" class="form-field">
+                <mat-label>Cancellation Code</mat-label>
+                <input matInput placeholder="Enter your 32-character code" formControlName="cancellationCode" required maxlength="32">
+                <mat-icon matSuffix>vpn_key</mat-icon> 
+                <!-- Error Messages -->
+                <mat-error *ngIf="f['cancellationCode'].touched && f['cancellationCode'].errors?.['required']">
+                    Cancellation code is required.
+                </mat-error>
+                 <mat-error *ngIf="f['cancellationCode'].touched && (f['cancellationCode'].errors?.['minlength'] || f['cancellationCode'].errors?.['maxlength'])">
+                    Code must be exactly 32 characters long.
+                 </mat-error>
+                  <mat-error *ngIf="f['cancellationCode'].touched && f['cancellationCode'].errors?.['pattern']">
+                    Code should only contain numbers (0-9) and letters (a-f).
+                 </mat-error>
+            </mat-form-field>
+
+             <!-- Loading Indicator -->
+             <div *ngIf="isLoading" style="text-align: center; padding: 10px;">
+                <mat-spinner diameter="30"></mat-spinner> Processing...
+             </div>
+
+        </form>
+    </mat-card-content>
+
+     <mat-card-actions align="end">
+         <!-- Back Button (Optional) -->
+          <button mat-stroked-button type="button" routerLink="/doctors" [disabled]="isLoading">
+              Back to Doctors
+          </button>
+         <!-- Submit Button -->
+          <button mat-raised-button color="warn" type="submit" [disabled]="isLoading || cancelForm.invalid" (click)="onSubmit()">
+             <mat-icon>cancel_schedule_send</mat-icon> Cancel Appointment
+          </button>
+     </mat-card-actions>
+
+</mat-card>
+
+<style>
+    .form-field { width: 100%; margin-bottom: 10px; }
+</style>

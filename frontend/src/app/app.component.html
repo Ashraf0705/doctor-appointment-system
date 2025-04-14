@@ -1,1 +1,13 @@
-<router-outlet></router-outlet>
+<mat-toolbar color="primary">
+    <mat-icon>local_hospital</mat-icon>
+    <span>Doctor Appointment System</span> 
+    <span class="spacer"></span> 
+    <button mat-button routerLink="/doctors"><mat-icon>group</mat-icon> Doctors</button>
+    <button mat-button routerLink="/appointments"><mat-icon>list_alt</mat-icon> Appointments</button>
+     <button mat-button routerLink="/cancel-appointment"><mat-icon>event_busy</mat-icon> Cancel Booking</button>
+  </mat-toolbar>
+  
+  <!-- Wrap router-outlet in a main tag or div for styling -->
+  <main class="content-wrapper">
+     <router-outlet></router-outlet> 
+  </main>

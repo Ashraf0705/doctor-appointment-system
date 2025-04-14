@@ -1,0 +1,88 @@
+<mat-card *ngIf="managementToken"> <!-- Only show card if token exists -->
+    <mat-card-header>
+        <mat-card-title>Manage Your Appointments</mat-card-title>
+        <mat-card-subtitle>Confirm or cancel pending appointments</mat-card-subtitle>
+        <!-- TODO: Display Doctor Name here once fetched -->
+    </mat-card-header>
+
+    <mat-card-content>
+        <!-- Loading Indicator -->
+        <div *ngIf="isLoadingAppointments" style="text-align: center; padding: 20px;">
+            <mat-spinner diameter="50"></mat-spinner>
+            <p>Loading your appointments...</p>
+        </div>
+
+        <!-- Error Message Display -->
+        <div *ngIf="errorMessage && !isLoadingAppointments" class="error-message">
+            <mat-icon color="warn">error_outline</mat-icon>
+            <span>{{ errorMessage }}</span>
+            <button mat-stroked-button color="warn" (click)="refreshAppointments()">Retry</button>
+        </div>
+
+        <!-- Appointments List -->
+        <div *ngIf="!isLoadingAppointments && !errorMessage">
+            <mat-list *ngIf="appointments.length > 0; else noAppointments">
+                <h3 matSubheader>Your Appointments</h3>
+                <ng-container *ngFor="let appt of appointments">
+                    <mat-list-item>
+                        <mat-icon matListItemIcon>person_pin</mat-icon> <!-- Patient Icon -->
+                        <div matListItemTitle>{{ appt.patient_name }}</div>
+                        <div matListItemLine>Contact: {{ appt.patient_contact_info }}</div>
+                        <div matListItemLine>
+                            Time: {{ appt.appointment_time | date:'fullDate' }} at {{ appt.appointment_time | date:'shortTime' }}
+                        </div>
+                        
+                        <div matListItemMeta style="display: flex; align-items: center; gap: 10px;">
+                            <!-- Status Chip -->
+                            <mat-chip [color]="getStatusColor(appt.status)" selected disabled>
+                                {{ appt.status }}
+                            </mat-chip>
+
+                            <!-- Action Buttons (Only if Pending) -->
+                            <ng-container *ngIf="appt.status === 'Pending'">
+                                <button mat-icon-button color="primary" matTooltip="Confirm Appointment" (click)="confirmAppointment(appt.id)">
+                                    <mat-icon>check_circle</mat-icon>
+                                </button>
+                                <button mat-icon-button color="warn" matTooltip="Cancel Appointment" (click)="cancelAppointment(appt.id)">
+                                    <mat-icon>cancel</mat-icon>
+                                </button>
+                            </ng-container>
+                        </div>
+
+                    </mat-list-item>
+                    <mat-divider></mat-divider>
+                </ng-container>
+            </mat-list>
+
+             <!-- Message if no appointments found -->
+             <ng-template #noAppointments>
+                <p style="padding: 15px; text-align: center;">You have no appointments matching the current filter.</p>
+            </ng-template>
+        </div>
+
+         <!-- TODO: Add section for managing Availability Blocks here later -->
+          <!-- TODO: Add section for editing Profile Info here later -->
+
+    </mat-card-content>
+     <mat-card-actions align="end">
+        <button mat-stroked-button routerLink="/doctors">
+            <mat-icon>arrow_back</mat-icon> Back to Doctors List
+        </button>
+     </mat-card-actions>
+
+</mat-card>
+
+<div *ngIf="!managementToken && !errorMessage" class="error-message">
+    <mat-icon color="warn">error</mat-icon> Invalid Access: Management token missing in URL.
+</div>
+
+
+<!-- Basic Error Styling -->
+<style>
+  .error-message {
+    color: red; background-color: #fff0f0; padding: 15px;
+    margin: 10px 0; border: 1px solid red; border-radius: 4px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  /* Add Tooltip styling if needed - requires MatTooltipModule import */
+</style>
