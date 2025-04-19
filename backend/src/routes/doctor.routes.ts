@@ -5,7 +5,6 @@ const router = Router();
 
 // Define Doctor routes
 router.get('/', getAllDoctorsController);
-router.post('/', createDoctorController);
 router.get('/:id', getDoctorByIdController as RequestHandler);
 router.put('/manage/:managementToken', updateDoctorByTokenController as RequestHandler);  
 router.delete('/manage/:managementToken', deleteDoctorByTokenController as RequestHandler);

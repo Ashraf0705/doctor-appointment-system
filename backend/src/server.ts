@@ -5,6 +5,7 @@ import doctorRoutes from './routes/doctor.routes';
 import availabilityRoutes from './routes/availability.routes';
 import slotRoutes from './routes/slot.routes';
 import appointmentRoutes from './routes/appointment.routes';
+import authRoutes from './auth/auth.routes';
 // Import other route files here as you create them (e.g., appointmentRoutes)
 
 // Basic configuration (replace with actual config later)
@@ -19,6 +20,7 @@ app.use(express.json()); // Parse JSON request bodies
 
 // --- API Routes ---
 // Mount the doctor routes
+app.use('/api/auth', authRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/availability', availabilityRoutes);
 app.use('/api/slots', slotRoutes);
